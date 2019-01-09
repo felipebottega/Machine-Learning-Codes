@@ -4,9 +4,9 @@ In the past two years I've studying machine learning by myself through some book
 
 The following readings were very helpful in my journey through the world of machine learning.
 
-Python Data Science Handbook: Essential Tools for Working with Data. Author: J. VanderPlas<br />
-Pattern Recognition and Machine Learning. Author: Book by Christopher Bishop<br />
-Information Theory, Inference and Learning Algorithms. Author: David J. C. MacKay<br />
-Deep Learning. Authors: Ian Goodfellow, Yoshua Bengio, Aaron Courville, Francis Bach<br />
+*Python Data Science Handbook: Essential Tools for Working with Data.* Author: J. VanderPlas<br />
+*Pattern Recognition and Machine Learning.* Author: Book by Christopher Bishop<br />
+*Information Theory, Inference and Learning Algorithms.* Author: David J. C. MacKay<br />
+*Deep Learning.* Authors: Ian Goodfellow, Yoshua Bengio, Aaron Courville, Francis Bach<br />
 
-For anyone interested in entering this fascinating world I recommend the Stanford's online course ['Machine Learning'](https://www.coursera.org/learn/machine-learning), with Andrew Ng. 
+For anyone interested in entering this fascinating world I recommend the Stanford's online course [*Machine Learning*](https://www.coursera.org/learn/machine-learning), with Andrew Ng. 
