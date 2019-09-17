@@ -325,7 +325,7 @@ for m in range(min_month, max_month+1):
                 actual = data_example.iloc[i]['QTY_ORDER']
                 errors.append(np.log(1+predicted) - np.log(actual))
                 errors_tmp = np.array(errors)
-                cum_errors.append(np.mean(errors_tmp**2)) 
+                cum_errors.append(np.sqrt(np.mean(errors_tmp**2))) 
                 predictions[str(m)+'_'+p] = [actual, predicted]
                 i += 1
 
