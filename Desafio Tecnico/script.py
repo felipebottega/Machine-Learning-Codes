@@ -4,7 +4,6 @@ import sqlite3
 import matplotlib.pyplot as plt
 import seaborn as sns
 from sklearn.cluster import KMeans
-from sklearn.metrics import f1_score
 import sys
 import warnings
 
