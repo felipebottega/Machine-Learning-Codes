@@ -309,7 +309,7 @@ def prediction(month, product, revenue_b, revenue_c, train_results_updated):
     return dataset.iloc[idx]['QTY_ORDER']
 
 
-# Criamos um dicionário para guardar as predisões por mês e produto.
+# Criamos um dicionário para guardar as predições por mês e produto.
 predictions = {}
 errors = []
 cum_errors = []
