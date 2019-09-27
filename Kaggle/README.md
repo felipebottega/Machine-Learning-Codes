@@ -1,6 +1,6 @@
 # Machine-Learning-Codes: Kaggle
 
-Below are the links to each Kaggle problem.
+Below are the links to each Kaggle problem. For a gentle introduction on how to use the tensor techniques (MLSVD and CPD), start reading the digit recognizer problem.
 
  [*digit recognizer*](https://www.kaggle.com/c/digit-recognizer)
  
