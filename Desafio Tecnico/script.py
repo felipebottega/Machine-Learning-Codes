@@ -23,18 +23,14 @@ conn = sqlite3.connect('data.db')
 sales.to_sql('sales', con=conn, if_exists='replace', index=False)
 comp.to_sql('comp', con=conn, if_exists='replace', index=False)
 
-# A partir daqui arrumamos o nome de algumas colunas, removemos os outliers, e agregamos os valores por produto
-# e data, somando e tirando as médias das quantidades e rendimentos.
-sales_updated = pd.read_sql('SELECT PROD, DATE, CAST(AVG(QTY) AS INT) QTY, AVG(REVENUE) REVENUE_B FROM \
+# Agregamos os valores por produto e data, somando e tirando as médias das quantidades e rendimentos.
+sales_updated = pd.read_sql('SELECT PROD, DATE, CAST(AVG(QTY) AS INT) QTY, AVG(REVENUE) REVENUE FROM \
                                  (SELECT PROD_ID PROD, DATE_ORDER DATE, SUM(QTY_ORDER) QTY, REVENUE FROM sales \
-                                  WHERE REVENUE <= 2980 \
                                   GROUP BY PROD, DATE, REVENUE) \
-                              GROUP BY PROD, DATE', conn)
-
-comp_updated = pd.read_sql('SELECT PROD_ID PROD, DATE, AVG(COMPETITOR_PRICE) REVENUE_C FROM \
-                                (SELECT  PROD_ID, date(DATE_EXTRACTION) DATE, COMPETITOR_PRICE FROM comp \
-                                 WHERE COMPETITOR_PRICE <= 8100) \
                              GROUP BY PROD, DATE', conn)
+
+comp_updated = pd.read_sql('SELECT PROD_ID PROD, date(DATE_EXTRACTION) DATE, COMPETITOR, AVG(COMPETITOR_PRICE) REVENUE, PAY_TYPE FROM comp \
+                            GROUP BY PROD, DATE', conn)
 
 # Fechamos a conexão após a criação dos dataframes.
 conn.close()
@@ -45,25 +41,28 @@ sales_updated.to_sql('sales', con=conn, if_exists='replace', index=False)
 comp_updated.to_sql('comp', con=conn, if_exists='replace', index=False)
 
 # Fazemos um join em relação a PROD e DATE.
-data = pd.read_sql('SELECT sales.PROD, sales.DATE, sales.QTY, sales.REVENUE_B, comp.REVENUE_C FROM sales \
+data = pd.read_sql('SELECT sales.PROD, sales.DATE, sales.QTY, sales.REVENUE REVENUE_B, comp.REVENUE REVENUE_C, comp.PAY_TYPE FROM sales \
                     LEFT JOIN comp ON (sales.PROD = comp.PROD AND sales.DATE = comp.DATE);', conn)
 
 # Este join irá introduzir alguns valores omissos quando a data de sales não tem correspondente em comp. Nesta situação
 # a coluna REVENUE_C irá receber o mesmo valor de REVENUE_B.
 data.loc[data['REVENUE_C'].isnull(), 'REVENUE_C'] = data.loc[data['REVENUE_C'].isnull(), 'REVENUE_B']
 
+# Os valores omissos de 'PAY_TYPE' serão preenchidos de maneira aleatória.
+L= data['PAY_TYPE'].isnull().sum()
+values = np.array(np.random.randint(1, 3, size=L), dtype=np.float64)
+data.loc[data['PAY_TYPE'].isnull(), 'PAY_TYPE'] = values
+
 # Será de interesse ter uma coluna apenas com os meses.
 data['MONTH'] = data['DATE'].str.split('-').str[1].astype('int')
 
 # Normalização dos dados.
 data_norm = data.copy()
-s = data_norm['QTY']
-s = ( s - s.mean() )/( s.max() - s.min() )
-data_norm['QTY'] = s
-for seller in ['B', 'C']:
-    s = data_norm['REVENUE_'+seller]
-    s = ( s - s.mean() )/( s.max() - s.min() )
-    data_norm['REVENUE_'+seller] = s
+for col in data_norm.columns:
+    if col not in ['PROD', 'DATE', 'MONTH']:
+        s = data_norm[col]
+        s = ( s - s.mean() )/( s.max() - s.min() )
+        data_norm[col] = s
     
 # Para cada par (mês, produto) teremos um conjunto de clusters. Começamos agrupando os dados desta maneira.
 train_groups = {}
@@ -81,7 +80,8 @@ train_results = {}
 def get_results(kmeans, scores):
     """
     Esta função coleta os resultados do método KMeans, de modo que o número de cluster
-    deve satisfazer abs(score[i]) < 1e-3, caso contrário assumimos 8 clusters.
+    deve satisfazer abs(score[i]) < 1e-3, caso contrário assumimos 4 clusters (o máximo 
+    possível são 120 clusters).
     """
     
     L = len(scores)
@@ -90,16 +90,15 @@ def get_results(kmeans, scores):
             return kmeans[i].cluster_centers_
     return kmeans[-1].cluster_centers_
 
-
 for m in range(min_month, max_month+1):
     for p in products:
         train_dataset = train_groups[str(m)+'_'+p]
-        n_cluster = range(1, min(20, train_dataset.shape[0]))
+        n_cluster = range(1, min(4, train_dataset.shape[0]))
         if train_dataset.size==0:
             pass
         else:
             # Sample é o dataframe relativo ao mês m e produto p.
-            sample = train_dataset[train_dataset['PROD']==p][['QTY', 'REVENUE_B', 'REVENUE_C']]
+            sample = train_dataset[train_dataset['PROD']==p][['QTY', 'REVENUE_B', 'REVENUE_C', 'PAY_TYPE']]
             # Aplicação do KMeans sobre sample.
             kmeans = [KMeans(n_clusters=i).fit(sample) for i in n_cluster]
             scores = [kmeans[i].score(sample) for i in range(len(kmeans))]
@@ -129,7 +128,7 @@ def denormalize(df, data):
     for seller in ['B', 'C']:
         s = data['REVENUE_'+seller]
         df['REVENUE_'+seller] = ( s.max() - s.min() )*df['REVENUE_'+seller] + s.mean()
-    return pd.DataFrame(df, columns=['QTY', 'REVENUE_B', 'REVENUE_C'])
+    return pd.DataFrame(df, columns=['QTY', 'REVENUE_B', 'REVENUE_C', 'PAY_TYPE'])
 
 
 # train_results_updated é a versão não-normalizada de train_results. Se trata de um dicionário com keys no
@@ -140,12 +139,11 @@ for m in range(min_month, max_month+1):
     for p in products:
         n_points = train_groups[str(m)+'_'+p].shape[0]
         if n_points != 0:
-            df = pd.DataFrame(train_results[str(m)+'_'+p], columns=['QTY', 'REVENUE_B', 'REVENUE_C']).copy()
+            df = pd.DataFrame(train_results[str(m)+'_'+p], columns=['QTY', 'REVENUE_B', 'REVENUE_C', 'PAY_TYPE']).copy()
             train_results_updated[str(m)+'_'+p] = denormalize(df, data) 
-            train_results_updated[str(m)+'_'+p]['QTY'] = train_results_updated[str(m)+'_'+p]['QTY'].astype('int').copy()
-            
+            train_results_updated[str(m)+'_'+p]['QTY'] = train_results_updated[str(m)+'_'+p]['QTY'].astype('int').copy()         
 
-def prediction(month, product, revenue_b, revenue_c, train_results_updated):
+def prediction(month, product, revenue_b, revenue_c, pay_type, train_results_updated):
     """
     Dado o mês, o produto e os dois preços, verificamos qual o centróide mais perto da 
     coordenadas dos preços. Este centróide está relacionado a uma certa quantidade que 
@@ -164,13 +162,13 @@ def prediction(month, product, revenue_b, revenue_c, train_results_updated):
     """
     
     dataset = train_results_updated[str(month)+'_'+product]
-    point1 = np.array([revenue_b, revenue_c])
+    point1 = np.array([revenue_b, revenue_c, pay_type])
     dataset_sz = dataset.shape[0]
     best_distance = np.inf
         
     # Busca pelo melhor centróide.
     for i in range(dataset_sz):
-        point2 = dataset.iloc[i][['REVENUE_B', 'REVENUE_C']].values
+        point2 = dataset.iloc[i][['REVENUE_B', 'REVENUE_C', 'PAY_TYPE']].values
         distance = np.linalg.norm(point1 - point2)
         if distance < best_distance:
             best_distance = distance
@@ -190,8 +188,8 @@ for m in range(min_month, max_month+1):
         if (data_example.size!=0) and (str(m)+'_'+p in train_results_updated.keys()):
             i = 0
             for x in range(data_example.shape[0]):
-                revenue_b, revenue_c = data_example.iloc[i]['REVENUE_B'], data_example.iloc[i]['REVENUE_C']
-                predicted = int(prediction(m, p, revenue_b, revenue_c, train_results_updated))
+                revenue_b, revenue_c, pay_type = data_example.iloc[i]['REVENUE_B'], data_example.iloc[i]['REVENUE_C'], data_example.iloc[i]['PAY_TYPE']
+                predicted = int(prediction(m, p, revenue_b, revenue_c, pay_type, train_results_updated))
                 actual = data_example.iloc[i]['QTY']
                 errors.append(np.log(1+predicted) - np.log(actual))
                 errors_tmp = np.array(errors)
@@ -199,7 +197,8 @@ for m in range(min_month, max_month+1):
                 predictions[str(m)+'_'+p] = [actual, predicted]
                 i += 1
 
-# Plot da evolução do RMSLE. Podemos ver que o modelo tende a melhorar conforme mais dados são inseridos nele.
+# Plot da evolução do RMSLE. Podemos ver que o modelo tende a melhorar conforme mais dados são 
+# inseridos nele.
 fig = plt.figure(figsize=[16, 6])
 plt.plot(cum_errors, '*')
 plt.xlabel('# observations')
