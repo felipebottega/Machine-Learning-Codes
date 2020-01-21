@@ -1,6 +1,6 @@
 # Machine-Learning-Codes
 
-In the past two years I've studying machine learning by myself through some books, online courses, videos, conversations and across the internet. After gathering a reasonable knowledge I started participate at some Kaggle's competitions. There are still many things to learn, but in the meantime I want to share with you my little piece of machine learning experience. I hope it is useful.
+In the past three years I've studying machine learning by myself through some books, online courses, videos, conversations and across the internet. After gathering a reasonable knowledge I started participate at some Kaggle's competitions. There are still many things to learn, but in the meantime I want to share with you my little piece of machine learning experience. I hope it is useful.
 
 The following readings were very helpful in my journey through the world of machine learning.
 
